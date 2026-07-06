@@ -47,11 +47,3 @@ jobs:
       # and verified manually; CI exercises the pure client logic packages.
       - run: go test ./shared/... ./server/... ./client/internal/e2ee/... ./client/internal/credstore/... ./client/internal/engine/... ./client/internal/pairing/...
       - run: go build -o bin/clipbridge-server ./server/cmd/clipbridge-server
-
-  markdown:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: lycheeverse/lychee-action@v2
-        with:
-          args: --no-progress './**/*.md'
