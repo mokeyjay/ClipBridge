@@ -34,7 +34,8 @@ RES_VERSION="${APP_VERSION#v}"
 WAILS3="go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha2.106"
 ICO="build/windows/icon.ico"
 # 1) 由 PNG 生成多尺寸 .ico（generate syso 需要 .ico，不接受 png）
-$WAILS3 generate icons -input assets/logo.png -windowsfilename "$ICO"
+# Linux runner 只借用 Wails CLI 生成 Windows 资源；关闭 CGO，避免加载宿主 GTK/WebKitGTK。
+CGO_ENABLED=0 $WAILS3 generate icons -input assets/logo.png -windowsfilename "$ICO"
 # 2) 写入版本信息（注入版本号，供 Explorer「文件属性」显示）
 cat > build/windows/info.json <<INFO
 {
@@ -49,7 +50,7 @@ cat > build/windows/info.json <<INFO
 }
 INFO
 # 3) 生成 rsrc_windows_<arch>.syso（图标 ID 3 + GUI 清单 + 版本），go build 自动链接
-$WAILS3 generate syso -arch "${TARGET_ARCH}" -icon "$ICO" \
+CGO_ENABLED=0 $WAILS3 generate syso -arch "${TARGET_ARCH}" -icon "$ICO" \
   -manifest build/windows/wails.exe.manifest -info build/windows/info.json
 
 echo "==> 交叉编译 Windows GUI（CGO-free，windowsgui 子系统不弹控制台；arch=${TARGET_ARCH}, version=${APP_VERSION}）"

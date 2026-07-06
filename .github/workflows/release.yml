@@ -108,10 +108,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           flavor: latest=false
-          # 正式版（tag 不含 -）额外打 latest；预发布版不打
+          # match 兼容 v0.1-beta.1 等非完整 SemVer；正式版（tag 不含 -）额外打 latest。
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=match,pattern=^v(.+)$,group=1
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
       - name: Build and push
         uses: docker/build-push-action@v6
