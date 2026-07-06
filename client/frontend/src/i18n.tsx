@@ -1,0 +1,427 @@
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+
+// 客户端双语支持（中文默认 / English）。语言持久化到 localStorage，可在「设置」切换。
+// 与 server/web 的 i18n 模式一致：Provider + useI18n + t(key)。
+
+export type Lang = "zh" | "en";
+
+type Dict = Record<string, string>;
+
+const zh = {
+  // tabs / 状态
+  tab_overview: "概览",
+  tab_settings: "设置",
+  tab_about: "关于",
+  status_connected: "已连接",
+  status_connecting: "连接中",
+  status_paused: "已暂停",
+  status_unpaired: "未配对",
+  status_error: "连接错误",
+  loading: "加载中…",
+
+  // 配对流程
+  connect_title: "连接到服务器",
+  connect_sub: "输入设备端口地址与 Web 配对页生成的 6 位配对码。",
+  f_address: "服务器地址",
+  f_code: "配对码",
+  f_devicename: "本设备名称",
+  ph_code: "6 位数字",
+  connect_btn: "连接",
+  verify_title: "核对服务器指纹",
+  verify_sub: "请确认下方 SHA-256 指纹与 Web 配对页显示的完全一致，再选择信任。",
+  cert_fp: "证书指纹（SHA-256）",
+  btn_back: "返回",
+  btn_trust: "信任并配对",
+  pairing_wait: "正在等待 Web 端二次确认…",
+  pairing_wait_sub: "请在 Web 配对页确认本设备的请求。",
+  err_addr: "服务器地址格式不正确",
+  err_code: "配对码需为 6 位数字",
+  toast_paired: "配对成功",
+  toast_copied: "已复制",
+
+  // 概览
+  ov_conn: "连接状态",
+  ov_count: "上传/下载次数",
+  ov_since: "自本次启动",
+  ov_server: "服务器",
+  sync_records: "同步记录",
+  rec_empty_t: "本次启动暂无同步记录",
+  rec_empty_s: "复制或粘贴内容后，同步活动会显示在这里。",
+  warn_cred_t: "凭据目录权限异常",
+  up: "上传",
+  down: "下载",
+  res_success: "成功",
+  res_failed: "失败",
+  res_ignored: "忽略",
+  // 同步记录提示语（与引擎 detail code 对应，随界面语言切换）
+  download_only_skip: "仅下载模式，已跳过上传",
+  type_not_allowed: "本机策略不允许该类型同步",
+  over_max_size: "超过最大同步尺寸，已跳过",
+  over_auto_upload: "超过自动上传阈值，待确认",
+  targets_query_failed: "目标查询失败",
+  target_fp_mismatch: "目标公钥指纹不一致，已阻断",
+  no_trusted_target: "无可信在线目标",
+  upload_failed: "上传失败",
+  confirm_timeout: "确认超时，已跳过",
+  ignored_unconfirmed: "已忽略（未确认）",
+  upload_only_reject: "仅上传模式，已拒绝",
+  unknown_type: "未知内容类型",
+  no_recv_dir: "未配置接收文件目录",
+  over_auto_download: "超过自动下载阈值，待确认",
+  unwrap_failed: "解封密钥失败",
+  decrypt_failed: "解密失败",
+  save_failed: "保存文件失败",
+  paused_banner_t: "同步已暂停",
+  paused_banner_s: "本机暂不上传或接收剪贴板内容，可在「设置」中恢复。",
+  resume: "恢复同步",
+
+  // 设置
+  s_pause: "暂停同步",
+  s_pause_sub: "暂停后不上传或接收剪贴板内容",
+  s_autostart: "开机自启",
+  s_autostart_sub: "登录系统后在后台启动剪驿",
+  s_direction: "同步方向",
+  dir_both: "双向",
+  dir_up: "仅上传",
+  dir_down: "仅下载",
+  dir_both_s: "上传本机内容，并接收远端内容",
+  dir_up_s: "只上传本机内容，不接收远端",
+  dir_down_s: "只接收远端内容，不上传本机",
+  s_notify: "通知策略",
+  nt_quiet: "安静",
+  nt_default: "默认",
+  nt_verbose: "详细",
+  nt_quiet_s: "仅在需要确认时通知",
+  nt_default_s: "待确认与同步错误会通知",
+  nt_verbose_s: "待确认、错误与每次成功都会通知",
+  test_notify: "测试通知",
+  toast_notify_ok: "测试通知已发送",
+  s_theme: "主题",
+  th_light: "亮色",
+  th_dark: "暗色",
+  th_auto: "跟随系统",
+  s_backdrop: "窗口材质",
+  bd_mica: "Mica",
+  bd_mica_s: "Windows 11 默认材质",
+  bd_acrylic: "Acrylic",
+  bd_acrylic_s: "更通透的亚克力效果",
+  s_lang: "语言",
+  lang_auto: "自动",
+  lang_zh: "中文",
+  lang_en: "English",
+  s_recv: "接收文件",
+  s_folder: "接收文件目录",
+  s_folder_sub: "其他设备同步过来的文件会保存到这里",
+  btn_browse: "浏览…",
+  s_filettl: "文件保持时长",
+  s_filettl_sub: "超过该天数的接收文件会被自动清理",
+  unit_days: "天",
+
+  // 同步策略覆盖
+  set_policy: "同步策略",
+  policy_note: "留空表示沿用账号的用户级默认；填写后仅本机生效，不影响账号默认。",
+  s_types: "同步类型",
+  s_maxsize: "最大同步尺寸",
+  s_maxsize_sub: "超过该尺寸的内容会被直接放弃，不进行同步",
+  s_autosize_up: "最大自动上传尺寸",
+  s_autosize_down: "最大自动下载尺寸",
+  s_autosize_sub: "小于该尺寸自动同步，超过则需确认（暂跳过）",
+  type_text: "文本",
+  type_image: "图片",
+  type_file: "文件",
+  type_rich: "富文本",
+  type_text_s: "纯文本",
+  type_image_s: "PNG 图片",
+  type_file_s: "单文件",
+  type_rich_s: "HTML / RTF",
+  inherit_account: "跟随账号默认",
+  inherited_prefix: "账号默认：",
+  use_local: "本机自定义",
+  toast_saved: "设置已保存",
+
+  // 关于
+  ab_identity: "身份信息",
+  ab_diag: "诊断信息",
+  ab_danger: "危险操作",
+  ab_device_uuid: "设备 UUID",
+  ab_user_uuid: "用户 UUID",
+  ab_server_uuid: "服务器 UUID",
+  ab_pubkey: "本设备公钥指纹",
+  ab_version: "客户端版本",
+  ab_lasterr: "最近一次错误",
+  ab_lasterr_none: "无",
+  ab_disconnect: "断开连接",
+  ab_reset: "重置客户端",
+  reset_title: "重置客户端？",
+  reset_intro: "此操作不可撤销。继续前请确认以下后果：",
+  reset_warn1: "删除本机所有凭据与本地设置",
+  reset_warn2: "需要重新配对才能继续同步",
+  reset_warn3: "旧设备记录需在 Web 端手动吊销",
+  reset_confirm: "确认重置",
+  btn_cancel: "取消",
+  toast_reset_done: "客户端已重置，请重新配对",
+
+  // 服务器证书指纹变化（引导式重置信任）
+  fp_banner_t: "服务器证书指纹已变化，同步已阻断",
+  fp_banner_s: "可能是服务器重新生成了证书（正常运维），也可能存在中间人风险。请打开 Web 后台「配对」页核对下方新指纹，确认一致后再信任；无法确认时请勿信任。",
+  fp_old: "已固定的旧指纹",
+  fp_new: "服务器当前指纹",
+  fp_trust_btn: "信任新指纹",
+  fp_trust_title: "信任服务器新指纹？",
+  fp_trust_body: "只有当你已在 Web 后台核对过新指纹并完全一致时才应继续。信任后本机将按新指纹强校验并恢复同步。",
+  fp_trust_confirm: "已核对一致，信任",
+  fp_repair_hint: "无法确认时，可在「关于」页重置客户端后重新配对。",
+  toast_fp_trusted: "已信任新指纹，正在重新连接",
+
+  // 对端设备公钥指纹变化（互验告警）
+  peer_banner_t: "设备公钥指纹已变化，同步已阻断",
+  peer_banner_s: "对端可能重新配对过（合法换钥），也可能存在密钥替换风险。请在两台设备的「关于」页或 Web 后台「设备」页人工核对指纹一致后再信任。",
+  peer_old: "曾信任",
+  peer_new: "当前",
+  peer_trust_btn: "信任新指纹",
+  peer_trust_title: "信任该设备的新指纹？",
+  peer_trust_body: "只有当你已在对端设备或 Web 后台核对过新指纹并完全一致时才应继续。",
+  toast_peer_trusted: "已信任该设备的新指纹",
+
+  // 关于页 · 设备互验
+  ab_verify: "设备互验",
+  ab_verify_sub: "在每台设备上核对同一台设备显示的公钥指纹是否一致；一致即可确认对端身份，与服务端无关。",
+  peer_self: "本机",
+  peer_trusted: "已信任",
+  peer_mismatch: "指纹变化",
+  peer_unseen: "未同步过",
+  peer_online: "在线",
+  peer_offline: "离线",
+  peers_empty: "暂无其他设备",
+  peers_need_conn: "连接服务器后可加载设备列表",
+};
+
+const en: Record<keyof typeof zh, string> = {
+  tab_overview: "Overview",
+  tab_settings: "Settings",
+  tab_about: "About",
+  status_connected: "Connected",
+  status_connecting: "Connecting",
+  status_paused: "Paused",
+  status_unpaired: "Not paired",
+  status_error: "Error",
+  loading: "Loading…",
+
+  connect_title: "Connect to server",
+  connect_sub: "Enter the device-port address and the 6-digit pairing code from the web console.",
+  f_address: "Server address",
+  f_code: "Pairing code",
+  f_devicename: "This device name",
+  ph_code: "6 digits",
+  connect_btn: "Connect",
+  verify_title: "Verify server fingerprint",
+  verify_sub: "Confirm the SHA-256 fingerprint below matches the web pairing page exactly before trusting.",
+  cert_fp: "Certificate fingerprint (SHA-256)",
+  btn_back: "Back",
+  btn_trust: "Trust & pair",
+  pairing_wait: "Waiting for confirmation on the web console…",
+  pairing_wait_sub: "Approve this device's request on the web pairing page.",
+  err_addr: "Invalid server address format",
+  err_code: "Pairing code must be 6 digits",
+  toast_paired: "Paired successfully",
+  toast_copied: "Copied",
+
+  ov_conn: "Connection",
+  ov_count: "Uploads / Downloads",
+  ov_since: "since launch",
+  ov_server: "Server",
+  sync_records: "Sync activity",
+  rec_empty_t: "No sync activity yet this session",
+  rec_empty_s: "Copy or paste something and sync events will appear here.",
+  warn_cred_t: "Credential directory permissions",
+  up: "Up",
+  down: "Down",
+  res_success: "OK",
+  res_failed: "Failed",
+  res_ignored: "Ignored",
+  download_only_skip: "Download-only mode; upload skipped",
+  type_not_allowed: "This type isn't allowed by local policy",
+  over_max_size: "Over the max sync size; skipped",
+  over_auto_upload: "Over the auto-upload limit; awaiting confirmation",
+  targets_query_failed: "Failed to query targets",
+  target_fp_mismatch: "Target key fingerprint mismatch; blocked",
+  no_trusted_target: "No trusted online device",
+  upload_failed: "Upload failed",
+  confirm_timeout: "Confirmation timed out; skipped",
+  ignored_unconfirmed: "Ignored (not confirmed)",
+  upload_only_reject: "Upload-only mode; rejected",
+  unknown_type: "Unknown content type",
+  no_recv_dir: "No received-files folder configured",
+  over_auto_download: "Over the auto-download limit; awaiting confirmation",
+  unwrap_failed: "Failed to unwrap key",
+  decrypt_failed: "Decryption failed",
+  save_failed: "Failed to save file",
+  paused_banner_t: "Syncing is paused",
+  paused_banner_s: "This device won't upload or receive clipboard content. Resume in Settings.",
+  resume: "Resume",
+
+  s_pause: "Pause syncing",
+  s_pause_sub: "Stop uploading and receiving clipboard content",
+  s_autostart: "Launch at login",
+  s_autostart_sub: "Start ClipBridge in the background after sign-in",
+  s_direction: "Sync direction",
+  dir_both: "Two-way",
+  dir_up: "Upload only",
+  dir_down: "Download only",
+  dir_both_s: "Upload local content and receive remote content",
+  dir_up_s: "Only upload local content; never receive",
+  dir_down_s: "Only receive remote content; never upload",
+  s_notify: "Notifications",
+  nt_quiet: "Quiet",
+  nt_default: "Default",
+  nt_verbose: "Verbose",
+  nt_quiet_s: "Only confirmation prompts",
+  nt_default_s: "Confirmations and sync errors",
+  nt_verbose_s: "Confirmations, errors and every success",
+  test_notify: "Test notification",
+  toast_notify_ok: "Test notification sent",
+  s_theme: "Theme",
+  th_light: "Light",
+  th_dark: "Dark",
+  th_auto: "System",
+  s_backdrop: "Window material",
+  bd_mica: "Mica",
+  bd_mica_s: "Windows 11 default material",
+  bd_acrylic: "Acrylic",
+  bd_acrylic_s: "A more translucent acrylic effect",
+  s_lang: "Language",
+  lang_auto: "Auto",
+  lang_zh: "中文",
+  lang_en: "English",
+  s_recv: "Received files",
+  s_folder: "Received files folder",
+  s_folder_sub: "Files synced from other devices are saved here",
+  btn_browse: "Browse…",
+  s_filettl: "File retention",
+  s_filettl_sub: "Received files older than this are cleaned up automatically",
+  unit_days: "days",
+
+  set_policy: "Sync policy",
+  policy_note: "Leave empty to use the account default; a local value applies to this device only and won't change the account default.",
+  s_types: "Sync types",
+  s_maxsize: "Max sync size",
+  s_maxsize_sub: "Content larger than this is dropped and never synced",
+  s_autosize_up: "Max auto-upload size",
+  s_autosize_down: "Max auto-download size",
+  s_autosize_sub: "Below this syncs automatically; above it needs confirmation (skipped for now)",
+  type_text: "Text",
+  type_image: "Image",
+  type_file: "File",
+  type_rich: "Rich text",
+  type_text_s: "Plain text",
+  type_image_s: "PNG image",
+  type_file_s: "Single file",
+  type_rich_s: "HTML / RTF",
+  inherit_account: "Use account default",
+  inherited_prefix: "Account default: ",
+  use_local: "Override locally",
+  toast_saved: "Settings saved",
+
+  ab_identity: "Identity",
+  ab_diag: "Diagnostics",
+  ab_danger: "Danger zone",
+  ab_device_uuid: "Device UUID",
+  ab_user_uuid: "User UUID",
+  ab_server_uuid: "Server UUID",
+  ab_pubkey: "This device's public key",
+  ab_version: "Client version",
+  ab_lasterr: "Last error",
+  ab_lasterr_none: "None",
+  ab_disconnect: "Disconnect",
+  ab_reset: "Reset client",
+  reset_title: "Reset client?",
+  reset_intro: "This is irreversible. Before continuing, make sure you understand:",
+  reset_warn1: "Deletes all local credentials and settings",
+  reset_warn2: "You'll need to pair again to resume syncing",
+  reset_warn3: "Revoke the old device record in the web console",
+  reset_confirm: "Reset",
+  btn_cancel: "Cancel",
+  toast_reset_done: "Client reset — please pair again",
+
+  fp_banner_t: "Server certificate fingerprint changed — sync blocked",
+  fp_banner_s: "The server may have regenerated its certificate (legitimate maintenance), or a man-in-the-middle could be at play. Verify the new fingerprint below on the web console's Pairing page before trusting; if you can't verify it, don't trust it.",
+  fp_old: "Pinned fingerprint",
+  fp_new: "Server's current fingerprint",
+  fp_trust_btn: "Trust new fingerprint",
+  fp_trust_title: "Trust the server's new fingerprint?",
+  fp_trust_body: "Continue only if you have verified the new fingerprint on the web console and it matches exactly. After trusting, this device pins the new fingerprint and syncing resumes.",
+  fp_trust_confirm: "Verified — trust it",
+  fp_repair_hint: "If you can't verify it, reset the client on the About page and pair again.",
+  toast_fp_trusted: "New fingerprint trusted; reconnecting",
+
+  peer_banner_t: "A device's key fingerprint changed — sync blocked",
+  peer_banner_s: "The device may have re-paired (a legitimate key change), or a key substitution could be at play. Compare fingerprints on both devices' About pages or the web console before trusting.",
+  peer_old: "Previously trusted",
+  peer_new: "Current",
+  peer_trust_btn: "Trust new fingerprint",
+  peer_trust_title: "Trust this device's new fingerprint?",
+  peer_trust_body: "Continue only if you have compared the new fingerprint on the other device or the web console and it matches exactly.",
+  toast_peer_trusted: "New fingerprint trusted",
+
+  ab_verify: "Device verification",
+  ab_verify_sub: "Compare the fingerprint shown for the same device on each of your devices; a match confirms its identity independently of the server.",
+  peer_self: "This device",
+  peer_trusted: "Trusted",
+  peer_mismatch: "Fingerprint changed",
+  peer_unseen: "Not synced yet",
+  peer_online: "Online",
+  peer_offline: "Offline",
+  peers_empty: "No other devices",
+  peers_need_conn: "Connect to the server to load devices",
+};
+
+const dicts: Record<Lang, Dict> = { zh, en };
+
+export type TKey = keyof typeof zh;
+
+// LangPref 是用户的语言偏好：auto 跟随系统，否则强制中/英。
+export type LangPref = "auto" | "zh" | "en";
+
+interface I18n {
+  lang: Lang; // 解析后的实际语言（auto → 按浏览器）
+  pref: LangPref; // 用户偏好（下拉框绑定）
+  setPref: (p: LangPref) => void;
+  t: (key: TKey) => string;
+}
+
+const I18nContext = createContext<I18n | null>(null);
+
+const PREF_KEY = "cb-lang";
+
+function initialPref(): LangPref {
+  const saved = localStorage.getItem(PREF_KEY);
+  return saved === "zh" || saved === "en" || saved === "auto" ? saved : "auto";
+}
+
+function detect(): Lang {
+  return navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [pref, setPrefState] = useState<LangPref>(initialPref());
+  const lang: Lang = pref === "auto" ? detect() : pref;
+  const value = useMemo<I18n>(
+    () => ({
+      lang,
+      pref,
+      setPref: (p) => {
+        localStorage.setItem(PREF_KEY, p);
+        setPrefState(p);
+      },
+      t: (key) => dicts[lang][key] ?? key,
+    }),
+    [lang, pref],
+  );
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+export function useI18n(): I18n {
+  const ctx = useContext(I18nContext);
+  if (!ctx) throw new Error("useI18n must be used within I18nProvider");
+  return ctx;
+}

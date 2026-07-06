@@ -1,0 +1,93 @@
+/* Tailwind CSS v4 必须最先导入 */
+@import "tailwindcss";
+
+/* HeroUI v3 样式必须在 Tailwind 之后导入 */
+@import "@heroui/styles";
+
+/*
+ * 控制台视觉方向：克制、可信赖的「运维工具」。Sora 作标题、Manrope 作正文、
+ * JetBrains Mono 展示 UUID/指纹/配对码；强调色为青绿，传达「连接 / 安全」。
+ * 背景用极轻的网格渐变增加层次，不喧宾夺主。
+ */
+:root {
+  /* HeroUI 同款蓝（与桌面客户端统一） */
+  --accent: oklch(0.62 0.19 253.83);
+  --accent-foreground: oklch(0.99 0 0);
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* 预留滚动条槽位：部分 tab 内容超长有滚动条、部分没有，避免切换 tab 时居中内容左右跳动。 */
+html {
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  /* 轻量氛围背景：两处径向光晕叠加基础底色 */
+  background:
+    radial-gradient(60rem 60rem at 12% -10%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 60%),
+    radial-gradient(50rem 50rem at 110% 0%, color-mix(in oklch, var(--accent) 10%, transparent), transparent 55%),
+    var(--background);
+  background-attachment: fixed;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+/* 液态玻璃顶栏：强模糊 + 提饱和 + 半透明，全宽浮于氛围背景之上。 */
+.glass-bar {
+  background: color-mix(in oklch, var(--background) 55%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid color-mix(in oklch, var(--foreground) 8%, transparent);
+  box-shadow:
+    0 1px 0 0 color-mix(in oklch, var(--background) 60%, transparent) inset,
+    0 8px 24px -16px rgb(0 0 0 / 0.25);
+}
+
+/* 玻璃卡片：更透明 + 强模糊 + 提饱和 + 细描边，与顶栏统一的液态玻璃质感，浮于氛围背景上。 */
+.surface-card {
+  background: color-mix(in oklch, var(--background) 48%, transparent);
+  border: 1px solid color-mix(in oklch, var(--foreground) 7%, transparent);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.03), 0 12px 32px -18px rgb(0 0 0 / 0.18);
+}
+
+/* 配对码大字展示 */
+.code-hero {
+  font-family: var(--font-mono);
+  letter-spacing: 0.3em;
+  font-weight: 600;
+}
+
+/*
+ * 顶栏 tabs 标签不换行：HeroUI 的 .tabs__tab 带 width:100%，多个 tab 会均分等宽，
+ * 比平均宽度长的标签会被压窄；中文默认可在任意字间断行，于是逐字换行。
+ * 强制 nowrap 后，flex 以文字宽度为下限，长标签不再换行。
+ */
+.tabs__tab {
+  white-space: nowrap;
+}

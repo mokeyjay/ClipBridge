@@ -1,0 +1,264 @@
+name: Release
+
+# 推送 v* tag 时触发：
+#   1. 构建 Web 控制台静态资源（server 二进制需 embed）
+#   2. 编译服务端 Linux 二进制（amd64/arm64）并打包
+#   3. 构建并推送服务端多架构 Docker 镜像到 GHCR
+#   4. 在 macOS runner 上构建 mac 客户端（universal .app）
+#   5. 交叉编译 Windows 客户端（.exe）
+#   6. 汇总全部产物，创建 GitHub Release 并上传 assets
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  GO_VERSION: "1.26.x"
+  NODE_VERSION: "22"
+
+jobs:
+  # 构建服务端 Web 控制台，产物供服务端二进制 embed 使用
+  console:
+    name: Build web console
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/web/package-lock.json
+      - name: Build console
+        working-directory: server/web
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: server/web/dist
+          if-no-files-found: error
+
+  # 编译服务端 Linux 二进制（纯 Go，CGO 关闭，跨架构无需 C 工具链）
+  server:
+    name: Build server ${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    needs: console
+    strategy:
+      fail-fast: false
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      # 取回控制台产物到 embed 路径（server/web/embed.go 需要 dist 存在）
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: server/web/dist
+      - name: Build binary
+        env:
+          GOWORK: "off" # 关闭 workspace，仅按 server 模块（replace 指向 ../shared）构建
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          package_name="clipbridge-server_${VERSION}_linux_${GOARCH}"
+          mkdir -p dist
+          cd server
+          go build -trimpath -ldflags "-s -w" -o "../${package_name}" ./cmd/clipbridge-server
+          cd ..
+          tar -czf "dist/${package_name}.tar.gz" "${package_name}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-server-${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+
+  # 构建并推送服务端多架构 Docker 镜像到 GHCR
+  docker:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: latest=false
+          # 正式版（tag 不含 -）额外打 latest；预发布版不打
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # 在 macOS runner 上构建 universal .app（darwin 剪贴板依赖 cgo，必须原生构建）
+  macos:
+    name: Build macOS client
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Build ClipBridge.app (universal)
+        working-directory: client
+        env:
+          APP_VERSION: ${{ github.ref_name }}
+          TARGET_ARCH: universal
+        run: ./build-macos-app.sh
+      - name: Package
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # ditto 保留 .app 的资源分叉与权限，比 zip 更适合 macOS bundle
+          ditto -c -k --keepParent \
+            client/bin/ClipBridge.app \
+            "dist/ClipBridge_${VERSION}_macos_universal.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: dist/*
+          if-no-files-found: error
+
+  # 交叉编译 Windows 客户端（CGO-free，可在 ubuntu 上完成）
+  windows:
+    name: Build Windows client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Build ClipBridge.exe
+        working-directory: client
+        env:
+          APP_VERSION: ${{ github.ref_name }}
+          TARGET_ARCH: amd64
+        run: ./build-windows.sh
+      - name: Package
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          (cd client/bin && zip -9 "../../dist/ClipBridge_${VERSION}_windows_amd64.zip" ClipBridge.exe)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/*
+          if-no-files-found: error
+
+  # 汇总全部产物并发布 Release
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs: [server, docker, macos, windows]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Build release notes
+        env:
+          VERSION: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # 按提交历史找到上一个 tag，生成从上个版本到本次的提交列表
+          prev_tag="$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || true)"
+          {
+            echo "## 更新内容"
+            echo
+            if [ -n "${prev_tag}" ]; then
+              git log --no-merges --pretty=format:'- %s (%h)' "${prev_tag}..${VERSION}"
+              echo
+              echo
+              echo "**完整变更**: https://github.com/${REPO}/compare/${prev_tag}...${VERSION}"
+            else
+              git log --no-merges --pretty=format:'- %s (%h)' "${VERSION}"
+            fi
+            echo
+            echo
+            echo "## 服务端 Docker 镜像"
+            echo
+            echo '```'
+            echo "docker pull ${REGISTRY}/$(echo "${REPO}" | tr '[:upper:]' '[:lower:]'):${VERSION#v}"
+            echo '```'
+            echo
+            echo "> Windows 客户端需目标机安装 WebView2 运行时（Win11 内置，Win10 需安装一次）。"
+          } > release_notes.md
+          echo "----- release notes -----"
+          cat release_notes.md
+        # REGISTRY 在 env 顶层定义，这里通过 shell 展开
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          release_flags=()
+          if [[ "${VERSION#v}" == *-* ]]; then
+            release_flags+=(--prerelease --latest=false)
+          else
+            release_flags+=(--prerelease=false --latest)
+          fi
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            gh release edit "${VERSION}" \
+              --title "${VERSION}" \
+              --notes-file release_notes.md \
+              "${release_flags[@]}"
+            gh release upload "${VERSION}" dist/* --clobber
+          else
+            gh release create "${VERSION}" dist/* \
+              --title "${VERSION}" \
+              --notes-file release_notes.md \
+              "${release_flags[@]}"
+          fi

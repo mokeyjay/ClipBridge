@@ -1,0 +1,12 @@
+.git
+.github
+bin
+client
+data
+runtime
+prd
+scripts
+server/web/node_modules
+server/web/dist
+*.md
+*.png

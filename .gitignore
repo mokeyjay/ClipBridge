@@ -1,0 +1,14 @@
+PRD.MD
+/prd
+AGENTS.md
+CLAUDE.md
+.DS_Store
+/bin/
+/data/
+/runtime
+# Windows 资源对象文件（由 client/build-windows.sh 生成）
+*.syso
+# Windows 构建中由 PNG/版本号临时生成的图标与版本信息（构建后清理，勿提交）
+/client/build/windows/icon.ico
+/client/build/windows/info.json
+issue.md

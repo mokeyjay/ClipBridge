@@ -1,0 +1,22 @@
+# ClipBridge 服务端 Docker Compose 部署。
+# 使用说明见 docs/docker.md；数据全部落在 clipbridge-data 卷（容器内 /data）。
+services:
+  clipbridge:
+    # 正式发布镜像（多架构 amd64/arm64）。想本地构建时改用下面的 build 并注释掉 image
+    image: ghcr.io/mokeyjay/clipbridge:latest
+    # build: .
+    container_name: clipbridge
+    restart: unless-stopped
+    ports:
+      # 设备端口：自签名 HTTPS + WSS，客户端做证书指纹 pinning，直接对外暴露，不要套反向代理
+      - "8443:8443"
+      # Web 控制台：纯 HTTP。默认只绑本机回环，由宿主机上的反向代理终止 HTTPS 后转发；
+      # 若仅在内网使用且接受明文 HTTP，可改为 "8080:8080"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # SQLite、自签证书、临时密文、config.yaml 全部在 /data。
+      # 改用宿主机目录（bind mount）时需先 chown 10001:10001，容器以非 root 运行
+      - clipbridge-data:/data
+
+volumes:
+  clipbridge-data:

@@ -1,0 +1,57 @@
+name: CI
+
+# 当前阶段：Go 后端（shared 协议 + server 控制面与中转）+ 服务端 React Web 控制台。
+# server 二进制通过 //go:embed 嵌入 server/web/dist，因此 Go 作业需先构建控制台。
+# Wails 桌面客户端按精简手搭后置，落地后再补 desktop 作业。
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  console:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: server/web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: server/web/dist
+
+  go:
+    runs-on: ubuntu-latest
+    needs: console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+      # 先取回控制台构建产物到嵌入路径，再编译（embed 需要 dist 存在）。
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: server/web/dist
+      - run: test -z "$(gofmt -l server shared client)"
+      - run: go vet ./shared/... ./server/...
+      # Desktop app (main, clipboardadapter cgo, guiservice, Wails) is macOS-only
+      # and verified manually; CI exercises the pure client logic packages.
+      - run: go test ./shared/... ./server/... ./client/internal/e2ee/... ./client/internal/credstore/... ./client/internal/engine/... ./client/internal/pairing/...
+      - run: go build -o bin/clipbridge-server ./server/cmd/clipbridge-server
+
+  markdown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress './**/*.md'
