@@ -91,3 +91,52 @@ code,
 .tabs__tab {
   white-space: nowrap;
 }
+
+/* 配对确认弹窗：避开 HeroUI Modal portal 残留问题，同时保留类似的淡入缩放动效。 */
+.cb-pairing-modal {
+  animation: cb-pairing-backdrop-in 160ms ease-out both;
+}
+
+.cb-pairing-modal__dialog {
+  animation: cb-pairing-dialog-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.cb-pairing-modal--closing {
+  animation: cb-pairing-backdrop-out 160ms ease-in both;
+}
+
+.cb-pairing-modal--closing .cb-pairing-modal__dialog {
+  animation: cb-pairing-dialog-out 160ms ease-in both;
+}
+
+@keyframes cb-pairing-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cb-pairing-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes cb-pairing-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cb-pairing-dialog-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}

@@ -639,16 +639,16 @@ function AdminSettings() {
   return (
     <Card variant="default" className="surface-card mt-4 rounded-2xl">
       <Card.Content className="px-5 py-5">
-        <div className="flex max-w-md flex-col gap-4">
-          <TextField value={s.server_name} onChange={(v) => setS({ ...s, server_name: v })}>
+        <div className="flex max-w-4xl flex-col gap-4">
+          <TextField value={s.server_name} onChange={(v) => setS({ ...s, server_name: v })} className="max-w-md">
             <Label>{t("serverName")}</Label>
             <Input />
           </TextField>
-          <TextField value={maxMiB} onChange={(v) => setMaxMiB(v.replace(/[^\d.]/g, ""))}>
+          <TextField value={maxMiB} onChange={(v) => setMaxMiB(v.replace(/[^\d.]/g, ""))} className="max-w-md">
             <Label>{t("maxSyncSize")} (MiB)</Label>
             <Input inputMode="decimal" />
           </TextField>
-          <TextField value={String(s.sync_log_retention_days)} onChange={(v) => setS({ ...s, sync_log_retention_days: Number(v.replace(/[^\d]/g, "")) || 0 })}>
+          <TextField value={String(s.sync_log_retention_days)} onChange={(v) => setS({ ...s, sync_log_retention_days: Number(v.replace(/[^\d]/g, "")) || 0 })} className="max-w-md">
             <Label>{t("logRetention")}</Label>
             <Input inputMode="numeric" />
           </TextField>
@@ -666,14 +666,14 @@ function AdminSettings() {
                   key={opt.value}
                   value={opt.value}
                   variant="secondary"
-                  className="group relative rounded-2xl border border-default-200 bg-default-50/50 px-4 py-3 transition data-[selected=true]:border-accent data-[selected=true]:bg-accent/10"
+                  className="group relative min-h-24 w-full rounded-2xl border border-default-200 bg-default-50/50 px-4 py-3 transition data-[selected=true]:border-accent data-[selected=true]:bg-accent/10"
                 >
                   <Checkbox.Control className="absolute right-3 top-3 size-5 rounded-md">
                     <Checkbox.Indicator />
                   </Checkbox.Control>
-                  <Checkbox.Content>
-                    <Label className="font-medium">{t(opt.titleKey)}</Label>
-                    <Description className="text-xs text-foreground-secondary">{t(opt.descKey)}</Description>
+                  <Checkbox.Content className="flex min-h-16 w-full flex-col items-start justify-center gap-1 pr-10 text-left">
+                    <Label className="block text-base font-medium leading-tight">{t(opt.titleKey)}</Label>
+                    <Description className="block text-sm leading-snug text-foreground-secondary">{t(opt.descKey)}</Description>
                   </Checkbox.Content>
                 </Checkbox>
               ))}
