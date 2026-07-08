@@ -14,15 +14,15 @@ jobs:
       run:
         working-directory: server/web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: server/web/package-lock.json
       - run: npm ci
       - run: npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: server/web/dist
@@ -31,12 +31,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: console
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26.x"
+          # 仓库是 go.work 多模块结构，根目录无 go.sum；CI 覆盖全部模块，按通配匹配
+          cache-dependency-path: "**/go.sum"
       # 先取回控制台构建产物到嵌入路径，再编译（embed 需要 dist 存在）。
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: web-dist
           path: server/web/dist

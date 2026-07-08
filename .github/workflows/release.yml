@@ -28,8 +28,8 @@ jobs:
     name: Build web console
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -39,7 +39,7 @@ jobs:
         run: |
           npm ci
           npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: server/web/dist
@@ -55,12 +55,14 @@ jobs:
       matrix:
         goarch: [amd64, arm64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
+          # 仓库是 go.work 多模块结构，根目录无 go.sum，需显式指定缓存依据文件
+          cache-dependency-path: server/go.sum
       # 取回控制台产物到 embed 路径（server/web/embed.go 需要 dist 存在）
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: web-dist
           path: server/web/dist
@@ -79,7 +81,7 @@ jobs:
           go build -trimpath -ldflags "-s -w" -o "../${package_name}" ./cmd/clipbridge-server
           cd ..
           tar -czf "dist/${package_name}.tar.gz" "${package_name}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-server-${{ matrix.goarch }}
           path: dist/*
@@ -93,7 +95,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Log in to GHCR
@@ -131,11 +133,13 @@ jobs:
     name: Build macOS client
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/setup-node@v4
+          # 仓库是 go.work 多模块结构，根目录无 go.sum，需显式指定缓存依据文件
+          cache-dependency-path: client/go.sum
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Build and package per-arch ClipBridge.app
@@ -155,7 +159,7 @@ jobs:
               client/bin/ClipBridge.app \
               "dist/ClipBridge_${VERSION}_macos_${arch}.zip"
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-macos
           path: dist/*
@@ -166,11 +170,13 @@ jobs:
     name: Build Windows client
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/setup-node@v4
+          # 仓库是 go.work 多模块结构，根目录无 go.sum，需显式指定缓存依据文件
+          cache-dependency-path: client/go.sum
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Build ClipBridge.exe
@@ -186,7 +192,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           (cd client/bin && zip -9 "../../dist/ClipBridge_${VERSION}_windows_amd64.zip" ClipBridge.exe)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-windows
           path: dist/*
@@ -200,11 +206,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: release-*
           path: dist
