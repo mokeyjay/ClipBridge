@@ -56,7 +56,8 @@ docker compose logs clipbridge
 
 | 平台 | 下载文件 |
 | --- | --- |
-| macOS 13+（Apple Silicon / Intel） | `ClipBridge_<version>_macos_universal.zip` |
+| macOS 13+（Apple Silicon） | `ClipBridge_<version>_macos_arm64.zip` |
+| macOS 13+（Intel） | `ClipBridge_<version>_macos_amd64.zip` |
 | Windows 10 22H2+ / 11（amd64） | `ClipBridge_<version>_windows_amd64.zip` |
 
 > Windows 10 如果没装过 WebView2 Runtime 需要补一下；Windows 11 已内置。

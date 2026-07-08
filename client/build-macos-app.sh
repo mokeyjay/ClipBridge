@@ -28,10 +28,11 @@ fi
 
 echo "==> 编译 Go 二进制（arch=${TARGET_ARCH}, version=${APP_VERSION}）"
 # darwin 剪贴板适配依赖 cgo（Cocoa），编译必须开启 CGO
-LDFLAGS="-X main.version=${APP_VERSION}"
+# -s -w 去掉符号表与 DWARF 调试信息，可减小约 1/3 体积（与 Windows 构建保持一致）
+LDFLAGS="-s -w -X main.version=${APP_VERSION}"
 build_arch() {
-  # 按指定架构编译单架构二进制到 $1
-  CGO_ENABLED=1 GOOS=darwin GOARCH="$2" go build -ldflags "${LDFLAGS}" -o "$1" .
+  # 按指定架构编译单架构二进制到 $1（-trimpath 去除本机路径，产物可复现且更小）
+  CGO_ENABLED=1 GOOS=darwin GOARCH="$2" go build -trimpath -ldflags "${LDFLAGS}" -o "$1" .
 }
 mkdir -p bin
 if [ "$TARGET_ARCH" = "universal" ]; then

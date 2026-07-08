@@ -4,7 +4,7 @@ name: Release
 #   1. 构建 Web 控制台静态资源（server 二进制需 embed）
 #   2. 编译服务端 Linux 二进制（amd64/arm64）并打包
 #   3. 构建并推送服务端多架构 Docker 镜像到 GHCR
-#   4. 在 macOS runner 上构建 mac 客户端（universal .app）
+#   4. 在 macOS runner 上分别构建 arm64 / amd64 两个 mac 客户端 .app（按芯片拆分以减小包体）
 #   5. 交叉编译 Windows 客户端（.exe）
 #   6. 汇总全部产物，创建 GitHub Release 并上传 assets
 
@@ -125,7 +125,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  # 在 macOS runner 上构建 universal .app（darwin 剪贴板依赖 cgo，必须原生构建）
+  # 在 macOS runner 上构建 .app（darwin 剪贴板依赖 cgo，必须原生构建）。
+  # 按芯片分别打包单架构 .app，比 universal 双架构包体约小一半。
   macos:
     name: Build macOS client
     runs-on: macos-latest
@@ -137,22 +138,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: Build ClipBridge.app (universal)
-        working-directory: client
+      - name: Build and package per-arch ClipBridge.app
         env:
           APP_VERSION: ${{ github.ref_name }}
-          TARGET_ARCH: universal
-        run: ./build-macos-app.sh
-      - name: Package
-        env:
           VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           mkdir -p dist
-          # ditto 保留 .app 的资源分叉与权限，比 zip 更适合 macOS bundle
-          ditto -c -k --keepParent \
-            client/bin/ClipBridge.app \
-            "dist/ClipBridge_${VERSION}_macos_universal.zip"
+          # 前端产物与架构无关，先构建一次，两个架构复用
+          (cd client/frontend && npm ci && npm run build)
+          # 依次构建 arm64（Apple 芯片）与 amd64（Intel）单架构 .app 并分别打包
+          for arch in arm64 amd64; do
+            (cd client && TARGET_ARCH="$arch" SKIP_FRONTEND=1 ./build-macos-app.sh)
+            # ditto 保留 .app 的资源分叉与权限，比 zip 更适合 macOS bundle
+            ditto -c -k --keepParent \
+              client/bin/ClipBridge.app \
+              "dist/ClipBridge_${VERSION}_macos_${arch}.zip"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: release-macos
@@ -234,6 +236,8 @@ jobs:
             echo "docker pull ${REGISTRY}/$(echo "${REPO}" | tr '[:upper:]' '[:lower:]'):${VERSION#v}"
             echo '```'
             echo
+            echo "> macOS 客户端按芯片选择：Apple 芯片（M 系列）下载 \`macos_arm64\`，Intel 芯片下载 \`macos_amd64\`。"
+            echo ">"
             echo "> Windows 客户端需目标机安装 WebView2 运行时（Win11 内置，Win10 需安装一次）。"
           } > release_notes.md
           echo "----- release notes -----"
