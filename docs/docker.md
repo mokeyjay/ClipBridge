@@ -15,6 +15,8 @@ ClipBridge 服务端提供官方 Docker 镜像，适合自托管到任意 Linux 
 
 标签策略：`latest` 指向最新正式版；每个发布另有 `X.Y.Z` 与 `X.Y` 语义化标签；预发布版（tag 含 `-`）不更新 `latest`。生产环境建议固定 `X.Y.Z`。
 
+当前仅有预发布版，`latest` 标签尚不存在，因此仓库中的 docker-compose.yml 默认固定为当前版本号；也可以用环境变量 `CLIPBRIDGE_VERSION`（或 `.env` 文件）覆盖。
+
 ## 端口模型（重要）
 
 两个端口的暴露方式**不同**，这是 ClipBridge 安全模型的一部分：
@@ -25,12 +27,13 @@ ClipBridge 服务端提供官方 Docker 镜像，适合自托管到任意 Linux 
 ## 快速开始：docker run
 
 ```bash
+CLIPBRIDGE_VERSION=0.1-beta.2
 docker run -d --name clipbridge \
   --restart unless-stopped \
   -p 8443:8443 \
   -p 127.0.0.1:8080:8080 \
   -v clipbridge-data:/data \
-  ghcr.io/mokeyjay/clipbridge:latest
+  "ghcr.io/mokeyjay/clipbridge:${CLIPBRIDGE_VERSION}"
 ```
 
 首次启动会在日志中**打印一次**随机管理员用户名/密码，以及设备端证书指纹：
@@ -50,7 +53,7 @@ docker logs clipbridge
 ```yaml
 services:
   clipbridge:
-    image: ghcr.io/mokeyjay/clipbridge:latest
+    image: ghcr.io/mokeyjay/clipbridge:${CLIPBRIDGE_VERSION:-0.1-beta.2}
     container_name: clipbridge
     restart: unless-stopped
     ports:
@@ -99,20 +102,13 @@ docker compose logs clipbridge   # 查看首次启动的管理员凭据
 ```yaml
 device_listen_address: ":8443"    # 容器内设备口监听地址
 web_listen_address: ":8080"       # 容器内 Web 口监听地址
-public_base_url: "https://clip.example.com"   # 对外可达的 Web 基址，配对时展示
-trusted_proxy_cidrs: []           # 信任的反向代理网段，用于还原真实客户端 IP（配对限速）
 ```
 
 修改后 `docker restart clipbridge` 生效。容器场景下一般**不需要**改监听端口——在宿主机侧调整 `-p` 映射即可。若确实修改了 `web_listen_address`，注意镜像内置健康检查探测的是 `127.0.0.1:8080/healthz`，需在 compose 中覆盖 `healthcheck`。
 
-可通过 Web 控制台修改的业务配置（是否开放注册、最大同步尺寸等）保存在 SQLite 中，与本文件无关。
+可通过 Web 控制台修改的业务配置（最大同步尺寸、允许类型、日志保留等）保存在 SQLite 中，与本文件无关。
 
-### trusted_proxy_cidrs 与 Docker 网络
-
-Web 口经反向代理转发时，服务端看到的来源 IP 是代理的 IP。要让配对限速按真实客户端 IP 生效，需把代理地址所在网段加入 `trusted_proxy_cidrs`：
-
-- 反向代理跑在宿主机、Web 口映射到 `127.0.0.1:8080`：来源 IP 是 Docker 网桥网关（默认桥通常为 `172.17.0.1`，compose 项目网络一般在 `172.16.0.0/12` 内）。可配置 `trusted_proxy_cidrs: ["172.16.0.0/12"]`。
-- 反向代理与 ClipBridge 同一个 compose 网络：加入该网络的子网即可。
+源码配置结构中还保留了 `runtime_dir`、`public_base_url` 和 `trusted_proxy_cidrs`，但当前版本未将它们接入启动链路，请不要依赖。配对提交走直连的设备端口，限速直接使用该连接的 `RemoteAddr`。
 
 ## 反向代理示例（Web 口）
 
@@ -159,7 +155,9 @@ docker compose start clipbridge
 
 ```bash
 docker stop clipbridge
-docker run --rm -v clipbridge-data:/data ghcr.io/mokeyjay/clipbridge:latest -reset-admin-password
+CLIPBRIDGE_VERSION=0.1-beta.2
+docker run --rm -v clipbridge-data:/data \
+  "ghcr.io/mokeyjay/clipbridge:${CLIPBRIDGE_VERSION}" -reset-admin-password
 docker start clipbridge
 ```
 
@@ -172,6 +170,7 @@ docker start clipbridge
 ## 升级
 
 ```bash
+# 先更新镜像版本：修改 docker-compose.yml 中的默认版本号，或在 .env 中设置 CLIPBRIDGE_VERSION
 docker compose pull
 docker compose up -d
 ```
