@@ -15,6 +15,9 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 DATA_DIR="$ROOT/runtime"
 SERVER_LOG="$DATA_DIR/dev-server.log"
+# 开发用客户端配置目录：与正式安装的 ClipBridge（~/Library/Application Support/ClipBridge）隔离，
+# 避免调试时覆盖/污染正式配置。客户端通过 CLIPBRIDGE_CONFIG_DIR 环境变量识别。
+CLIENT_CONFIG_DIR="$DATA_DIR/client-config"
 START_CLIENT=1
 [ "${1:-}" = "--no-client" ] && START_CLIENT=0
 
@@ -57,8 +60,11 @@ grep -E "初始管理员凭据|fingerprint_sha256" "$SERVER_LOG" || \
 if [ "$START_CLIENT" = "1" ]; then
   echo "==> [4/4] 构建并启动 macOS 客户端"
   (cd client && ./build-macos-app.sh >/dev/null)
-  open "$ROOT/client/bin/ClipBridge.app"
-  echo "    已启动 ClipBridge.app（菜单栏托盘）"
+  mkdir -p "$CLIENT_CONFIG_DIR"
+  # -n 强制启动新实例（正式版 ClipBridge 运行中时 open 会因 bundle ID 相同而只激活它）；
+  # --env 注入配置目录环境变量（open 默认不透传 shell 环境）。
+  open -n --env "CLIPBRIDGE_CONFIG_DIR=$CLIENT_CONFIG_DIR" "$ROOT/client/bin/ClipBridge.app"
+  echo "    已启动 ClipBridge.app（菜单栏托盘），配置目录：$CLIENT_CONFIG_DIR"
 else
   echo "==> [4/4] 跳过桌面客户端（--no-client）"
 fi

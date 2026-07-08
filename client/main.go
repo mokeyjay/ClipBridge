@@ -6,6 +6,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -41,7 +42,8 @@ var version = "0.1.0"
 
 func main() {
 	// Credential/config directory (overridable for dev), opened with strict perms.
-	store, permWarn := credstore.Open(resolveConfigDir())
+	cfgDir := resolveConfigDir()
+	store, permWarn := credstore.Open(cfgDir)
 
 	// System clipboard; a failure is non-fatal and surfaces as a warning.
 	clip, clipErr := clipboardadapter.New()
@@ -153,12 +155,28 @@ func main() {
 		svc.HandleNotificationResponse(result.Response.ActionIdentifier, data)
 	})
 
+	// 单实例锁 ID 掺入配置目录哈希：同一配置目录禁止重复运行（两个进程会抢剪贴板、
+	// 共写凭据）；而 dev（CLIPBRIDGE_CONFIG_DIR 隔离）与正式版目录不同，可共存。
+	cfgHash := sha256.Sum256([]byte(cfgDir))
+
 	app := application.New(application.Options{
 		Name:        "ClipBridge",
 		Description: "端到端加密的剪贴板同步",
 		Icon:        appIcon,
 		Services:    []application.Service{application.NewService(svc), application.NewService(notifService)},
 		Assets:      application.AssetOptions{Handler: spaHandler()},
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID: fmt.Sprintf("com.clipbridge.desktop-%x", cfgHash[:8]),
+			// 重复启动时把已运行实例的设置窗口带到前台，让用户明白应用已在运行。
+			// 回调在后台 goroutine 触发，窗口操作须回到主线程执行。
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+				application.InvokeSync(func() {
+					if app := application.Get(); app != nil {
+						openWindow(app, svc)
+					}
+				})
+			},
+		},
 		Mac: application.MacOptions{
 			// Tray-resident: keep running after the window closes, no Dock icon.
 			ApplicationShouldTerminateAfterLastWindowClosed: false,

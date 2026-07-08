@@ -1006,6 +1006,10 @@ func (a *App) receivedDir(tempDir string) string {
 	if a.store != nil {
 		return filepath.Join(a.store.Dir(), "received")
 	}
+	// 与 main.resolveConfigDir 一致：优先环境变量覆盖（开发调试隔离），再回退平台默认
+	if dir := os.Getenv("CLIPBRIDGE_CONFIG_DIR"); dir != "" {
+		return filepath.Join(dir, "received")
+	}
 	base, err := os.UserConfigDir()
 	if err != nil {
 		base, _ = os.UserHomeDir()
