@@ -4,7 +4,7 @@ import { Window } from "@wailsio/runtime";
 import { App as Svc, onStatus, type StatusDTO } from "./api";
 import { useI18n } from "./i18n";
 import { applyTheme, type Theme } from "./util";
-import { StatusChip, Spinner } from "./components/common";
+import { StatusChip, Spinner, UpdateBadge } from "./components/common";
 import { OverviewPage } from "./pages/Overview";
 import { SettingsPage } from "./pages/Settings";
 import { AboutPage } from "./pages/About";
@@ -54,6 +54,10 @@ export function App() {
         ? "connected"
         : "connecting";
   const isWindows = status?.platform === "windows";
+  // 发现新版本时的顶栏入口：mac 放在连接状态左侧，Windows 放在连接状态右侧。
+  const updateBadge = status?.update_available ? (
+    <UpdateBadge version={status.latest_version} url={status.update_url} />
+  ) : null;
 
   // 平台标记写入 <html>，驱动平台相关样式（如 Windows 默认微软雅黑字体）。
   useEffect(() => {
@@ -72,9 +76,16 @@ export function App() {
           macOS：[交通灯留白 | Tabs | 连接状态]；
           Windows：无系统标题栏，[连接状态 | Tabs | 窗口控制按钮]（控制按钮在右侧）。 */}
       <header className="drag cb-divider-b grid h-[52px] shrink-0 grid-cols-[1fr_auto_1fr] items-center px-3">
-        {/* 左：mac 为交通灯留白（OS 在统一工具栏中垂直居中绘制）；Windows 放连接状态。 */}
-        <div className="flex items-center">
-          {isWindows ? <StatusChip state={headerState} /> : <div aria-hidden className="w-[68px]" />}
+        {/* 左：mac 为交通灯留白（OS 在统一工具栏中垂直居中绘制）；Windows 放连接状态 + 更新入口。 */}
+        <div className="flex items-center gap-2">
+          {isWindows ? (
+            <>
+              <StatusChip state={headerState} />
+              {updateBadge}
+            </>
+          ) : (
+            <div aria-hidden className="w-[68px]" />
+          )}
         </div>
         <Tabs
           selectedKey={tab}
@@ -93,8 +104,15 @@ export function App() {
             </Tabs.List>
           </Tabs.ListContainer>
         </Tabs>
-        <div className="flex items-center justify-end">
-          {isWindows ? <WinControls /> : <StatusChip state={headerState} />}
+        <div className="flex items-center justify-end gap-2">
+          {isWindows ? (
+            <WinControls />
+          ) : (
+            <>
+              {updateBadge}
+              <StatusChip state={headerState} />
+            </>
+          )}
         </div>
       </header>
 

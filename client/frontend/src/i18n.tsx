@@ -18,6 +18,8 @@ const zh = {
   status_unpaired: "未配对",
   status_error: "连接错误",
   loading: "加载中…",
+  update_new: "新版本",
+  update_hint: "发现新版本 {v}，点击查看",
 
   // 配对流程
   connect_title: "连接到服务器",
@@ -206,6 +208,8 @@ const en: Record<keyof typeof zh, string> = {
   status_unpaired: "Not paired",
   status_error: "Error",
   loading: "Loading…",
+  update_new: "New version",
+  update_hint: "New version {v} available — click to view",
 
   connect_title: "Connect to server",
   connect_sub: "Enter the device-port address and the 6-digit pairing code from the web console.",

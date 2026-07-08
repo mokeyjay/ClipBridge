@@ -32,6 +32,7 @@ import {
   RiTimeLine,
   type RemixiconComponentType,
 } from "@remixicon/react";
+import { Browser } from "@wailsio/runtime";
 import { useI18n } from "../i18n";
 
 // 统一图标层：第三方图标库 Remix Icon。页面仍按语义 name 引用，这里集中映射，
@@ -149,6 +150,25 @@ export function StatusChip({ state }: { state: string }) {
       <span className={`size-[7px] rounded-full ${DOT_CLASS[state] ?? DOT_CLASS.unpaired}`} />
       {t(labelKey[state] ?? "status_unpaired")}
     </span>
+  );
+}
+
+// UpdateBadge 是顶栏的「发现新版本」入口：绿色向上箭头 + 文案，点击用系统默认
+// 浏览器打开对应版本的 release 页面。仅当后端检测到更新时由调用方渲染。
+export function UpdateBadge({ version, url }: { version: string; url: string }) {
+  const { t } = useI18n();
+  return (
+    <button
+      type="button"
+      title={t("update_hint").replace("{v}", version || "")}
+      onClick={() => {
+        if (url) void Browser.OpenURL(url);
+      }}
+      className="no-drag inline-flex items-center gap-1 rounded-full bg-success/12 px-2.5 py-1 text-[12px] font-medium text-success transition hover:bg-success/20"
+    >
+      <Icon name="arrowUp" size={13} />
+      {t("update_new")}
+    </button>
   );
 }
 

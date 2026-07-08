@@ -24,6 +24,7 @@ import (
 	"github.com/mokeyjay/clipbridge/client/internal/engine"
 	"github.com/mokeyjay/clipbridge/client/internal/filestore"
 	"github.com/mokeyjay/clipbridge/client/internal/pairing"
+	"github.com/mokeyjay/clipbridge/client/internal/updatecheck"
 	"github.com/mokeyjay/clipbridge/shared/protocol"
 )
 
@@ -80,6 +81,11 @@ type StatusDTO struct {
 	Autostart            bool              `json:"autostart"`               // launch at login
 	Platform             string            `json:"platform"`                // "darwin" | "windows" (drives platform-specific UI)
 	WindowsBackdrop      string            `json:"windows_backdrop"`        // Windows 11 窗口材质:mica | acrylic
+
+	// 客户端自动更新检查：发现更新时置位，前端在顶栏展示「新版本」入口。
+	UpdateAvailable bool   `json:"update_available"` // 是否存在更新的正式版
+	LatestVersion   string `json:"latest_version"`   // 最新正式版标签（如 v1.2.0）
+	UpdateURL       string `json:"update_url"`       // 对应版本的 release 页面地址
 
 	// Sync policy: per-field inherit/override (device settings) resolved against
 	// the account default. Populated once connected; zero values until then.
@@ -216,8 +222,12 @@ type App struct {
 	// 由 connectLoop 检测置位、成功连接或用户显式处理后清除。
 	fpMismatch bool
 	fpNew      string
-	rootCtx    context.Context
-	runCancel  context.CancelFunc
+	// 更新检查结果：发现更新的正式版时置位，供顶栏展示与跳转。
+	updateAvailable bool
+	latestVersion   string
+	latestURL       string
+	rootCtx         context.Context
+	runCancel       context.CancelFunc
 
 	// settings-window bounds (in-memory; flushed to profile on close/quit)
 	winX, winY, winW, winH int
@@ -513,6 +523,45 @@ func (a *App) Boot(ctx context.Context, store *credstore.Store) {
 	a.mu.Unlock()
 	if paired {
 		a.startRuntime()
+	}
+	// 客户端自动更新检查：与其他功能解耦，独立后台协程运行，不阻塞启动。
+	go a.updateCheckLoop(ctx)
+}
+
+// updateCheckLoop 检查是否有新的正式版：冷启动立即检查一次，之后每 24 小时检查
+// 一次。全程异步、失败静默，绝不阻塞其他功能。
+func (a *App) updateCheckLoop(ctx context.Context) {
+	a.checkForUpdate(ctx)
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			a.checkForUpdate(ctx)
+		}
+	}
+}
+
+// checkForUpdate 拉取仓库最新正式版并与当前版本比较，发现更新时记录版本与
+// release 页面地址并推送状态给前端。任何失败都静默忽略（保持既有状态不变）。
+func (a *App) checkForUpdate(ctx context.Context) {
+	rel, err := updatecheck.Latest(ctx)
+	if err != nil || rel == nil {
+		return
+	}
+	if !updatecheck.IsNewer(rel.TagName, a.version) {
+		return
+	}
+	a.mu.Lock()
+	changed := !a.updateAvailable || a.latestVersion != rel.TagName
+	a.updateAvailable = true
+	a.latestVersion = rel.TagName
+	a.latestURL = rel.HTMLURL
+	a.mu.Unlock()
+	if changed {
+		a.pushStatus()
 	}
 }
 
@@ -941,7 +990,8 @@ func (a *App) Status() StatusDTO {
 		Direction: defaultStr(a.direction, "bidirectional"), NotifyPolicy: defaultStr(a.notifyLevel, "default"),
 		LastError: a.lastError, PermissionWarn: a.clipWarn, Platform: runtime.GOOS,
 		ServerFPMismatch: a.fpMismatch, NewServerFP: a.fpNew,
-		PeerMismatches: []PeerMismatchDTO{},
+		PeerMismatches:  []PeerMismatchDTO{},
+		UpdateAvailable: a.updateAvailable, LatestVersion: a.latestVersion, UpdateURL: a.latestURL,
 	}
 	if a.eng != nil {
 		st.SyncCount = a.eng.SyncCount()

@@ -330,6 +330,22 @@ export class StatusDTO {
     "windows_backdrop": string;
 
     /**
+     * 客户端自动更新检查：发现更新时置位，前端在顶栏展示「新版本」入口。
+     * 是否存在更新的正式版
+     */
+    "update_available": boolean;
+
+    /**
+     * 最新正式版标签（如 v1.2.0）
+     */
+    "latest_version": string;
+
+    /**
+     * 对应版本的 release 页面地址
+     */
+    "update_url": string;
+
+    /**
      * Sync policy: per-field inherit/override (device settings) resolved against
      * the account default. Populated once connected; zero values until then.
      */
@@ -412,6 +428,15 @@ export class StatusDTO {
         if (!("windows_backdrop" in $$source)) {
             this["windows_backdrop"] = "";
         }
+        if (!("update_available" in $$source)) {
+            this["update_available"] = false;
+        }
+        if (!("latest_version" in $$source)) {
+            this["latest_version"] = "";
+        }
+        if (!("update_url" in $$source)) {
+            this["update_url"] = "";
+        }
         if (!("max_sync_size" in $$source)) {
             this["max_sync_size"] = (new SizeSettingDTO());
         }
@@ -433,25 +458,25 @@ export class StatusDTO {
      */
     static createFrom($$source: any = {}): StatusDTO {
         const $$createField10_0 = $$createType1;
-        const $$createField24_0 = $$createType2;
-        const $$createField25_0 = $$createType2;
-        const $$createField26_0 = $$createType2;
-        const $$createField27_0 = $$createType3;
+        const $$createField27_0 = $$createType2;
+        const $$createField28_0 = $$createType2;
+        const $$createField29_0 = $$createType2;
+        const $$createField30_0 = $$createType3;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("peer_mismatches" in $$parsedSource) {
             $$parsedSource["peer_mismatches"] = $$createField10_0($$parsedSource["peer_mismatches"]);
         }
         if ("max_sync_size" in $$parsedSource) {
-            $$parsedSource["max_sync_size"] = $$createField24_0($$parsedSource["max_sync_size"]);
+            $$parsedSource["max_sync_size"] = $$createField27_0($$parsedSource["max_sync_size"]);
         }
         if ("auto_upload" in $$parsedSource) {
-            $$parsedSource["auto_upload"] = $$createField25_0($$parsedSource["auto_upload"]);
+            $$parsedSource["auto_upload"] = $$createField28_0($$parsedSource["auto_upload"]);
         }
         if ("auto_download" in $$parsedSource) {
-            $$parsedSource["auto_download"] = $$createField26_0($$parsedSource["auto_download"]);
+            $$parsedSource["auto_download"] = $$createField29_0($$parsedSource["auto_download"]);
         }
         if ("sync_types" in $$parsedSource) {
-            $$parsedSource["sync_types"] = $$createField27_0($$parsedSource["sync_types"]);
+            $$parsedSource["sync_types"] = $$createField30_0($$parsedSource["sync_types"]);
         }
         return new StatusDTO($$parsedSource as Partial<StatusDTO>);
     }
