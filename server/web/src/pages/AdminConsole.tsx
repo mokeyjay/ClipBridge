@@ -224,55 +224,53 @@ export function ConfirmModal({
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  // 受控弹窗：Modal.Backdrop 直接作根节点（外包 <Modal> 会与 isOpen 状态冲突导致关不掉）。
   return (
-    <Modal>
-      <Modal.Backdrop isOpen={open} onOpenChange={(o) => !o && onClose()}>
-        <Modal.Container>
-          <Modal.Dialog>
-            <Modal.CloseTrigger />
-            <Modal.Header><Modal.Heading>{title}</Modal.Heading></Modal.Header>
-            <Modal.Body><p className="text-sm text-foreground-secondary">{body}</p></Modal.Body>
-            <Modal.Footer>
-              <Button variant="tertiary" onPress={onClose}>{t("cancel")}</Button>
-              <Button variant={danger ? "danger" : "primary"} onPress={onConfirm}>{confirmLabel}</Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    <Modal.Backdrop isOpen={open} onOpenChange={(o) => !o && onClose()}>
+      <Modal.Container>
+        <Modal.Dialog>
+          <Modal.CloseTrigger />
+          <Modal.Header><Modal.Heading>{title}</Modal.Heading></Modal.Header>
+          <Modal.Body><p className="text-sm text-foreground-secondary">{body}</p></Modal.Body>
+          <Modal.Footer>
+            <Button variant="tertiary" onPress={onClose}>{t("cancel")}</Button>
+            <Button variant={danger ? "danger" : "primary"} onPress={onConfirm}>{confirmLabel}</Button>
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }
 
 // PasswordRevealModal 一次性展示重置后的新密码，并提供复制。
 function PasswordRevealModal({ reveal, onClose }: { reveal: { username: string; password: string } | null; onClose: () => void }) {
   const { t } = useI18n();
+  // 受控弹窗：Modal.Backdrop 直接作根节点（外包 <Modal> 会与 isOpen 状态冲突导致关不掉）。
   return (
-    <Modal>
-      <Modal.Backdrop isOpen={reveal !== null} onOpenChange={(o) => !o && onClose()}>
-        <Modal.Container>
-          <Modal.Dialog>
-            <Modal.CloseTrigger />
-            <Modal.Header><Modal.Heading>{t("newPasswordTitle")}</Modal.Heading></Modal.Header>
-            <Modal.Body>
-              {reveal && (
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm text-foreground-secondary">{reveal.username}</p>
-                  <div className="flex items-center gap-2">
-                    <code className="mono flex-1 break-all rounded-xl bg-default-100 px-3 py-2 text-sm">{reveal.password}</code>
-                    <Button size="sm" variant="secondary" onPress={() => void navigator.clipboard?.writeText(reveal.password).then(() => toastOK(t("copied")))}>
-                      {t("copy")}
-                    </Button>
-                  </div>
+    <Modal.Backdrop isOpen={reveal !== null} onOpenChange={(o) => !o && onClose()}>
+      <Modal.Container>
+        <Modal.Dialog>
+          <Modal.CloseTrigger />
+          <Modal.Header><Modal.Heading>{t("newPasswordTitle")}</Modal.Heading></Modal.Header>
+          <Modal.Body>
+            {reveal && (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-foreground-secondary">{reveal.username}</p>
+                <div className="flex items-center gap-2">
+                  <code className="mono flex-1 break-all rounded-xl bg-default-100 px-3 py-2 text-sm">{reveal.password}</code>
+                  <Button size="sm" variant="secondary" onPress={() => void navigator.clipboard?.writeText(reveal.password).then(() => toastOK(t("copied")))}>
+                    {t("copy")}
+                  </Button>
                 </div>
-              )}
-            </Modal.Body>
-            <Modal.Footer>
-              <Button onPress={onClose}>{t("done")}</Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button onPress={onClose}>{t("done")}</Button>
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }
 

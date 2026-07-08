@@ -43,8 +43,8 @@ export function UserConsole({ me }: { me: Me }) {
         <Tabs.Panel id="policy"><SyncPolicy /></Tabs.Panel>
         <Tabs.Panel id="account"><Account me={me} /></Tabs.Panel>
       </ConsoleShell>
-      {/* 全局：检测到新的待确认设备时弹窗（贯穿所有 tab） */}
-      <PendingWatcher />
+      {/* 全局：检测到新的待确认设备时弹窗（贯穿所有 tab）；确认成功后跳到设备页 */}
+      <PendingWatcher onConfirmed={() => setTab("devices")} />
     </Tabs>
   );
 }
@@ -137,7 +137,8 @@ function UserDevices() {
 }
 
 // PendingWatcher 轮询待确认设备，出现新请求时弹窗（确认/拒绝），不再常驻列表。
-function PendingWatcher() {
+// onConfirmed 在确认成功后触发，供上层跳转到设备页展示新配对的设备。
+function PendingWatcher({ onConfirmed }: { onConfirmed: () => void }) {
   const { t } = useI18n();
   const [selected, setSelected] = useState<PendingRequest | null>(null);
   const seen = useRef<Set<string>>(new Set());
@@ -176,6 +177,7 @@ function PendingWatcher() {
     try {
       await user.confirmRequest(id);
       toastOK(t("pairingConfirmed"));
+      onConfirmed();
     } catch (e) {
       toastErr(t("opFailed"), errText(e, t));
     }
@@ -190,31 +192,31 @@ function PendingWatcher() {
     }
   };
 
+  // 受控弹窗：Modal.Backdrop 直接作根节点（外面再包 <Modal> 会引入触发器自身的
+  // 开关状态，与 isOpen 冲突，导致 setSelected(null) 后弹窗关不掉）。
   return (
-    <Modal>
-      <Modal.Backdrop isOpen={selected !== null} onOpenChange={(o) => !o && setSelected(null)}>
-        <Modal.Container>
-          <Modal.Dialog>
-            <Modal.CloseTrigger />
-            <Modal.Header><Modal.Heading>{t("newPairingRequest")}</Modal.Heading></Modal.Header>
-            <Modal.Body>
-              {selected && (
-                <div className="flex flex-col gap-1">
-                  <Row label={t("username")} value={selected.device_name} />
-                  <Row label={t("platform")} value={`${selected.platform} ${selected.client_version}`} />
-                  <Row label={t("requestTime")} value={formatTime(selected.created_at)} />
-                  <Row label={t("keyFingerprint")} value={<code className="mono text-xs break-all">{selected.key_fingerprint}</code>} />
-                </div>
-              )}
-            </Modal.Body>
-            <Modal.Footer>
-              {selected && <Button variant="danger-soft" onPress={() => void reject(selected.request_id)}>{t("reject")}</Button>}
-              {selected && <Button onPress={() => void confirm(selected.request_id)}>{t("confirm")}</Button>}
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    <Modal.Backdrop isOpen={selected !== null} onOpenChange={(o) => !o && setSelected(null)}>
+      <Modal.Container>
+        <Modal.Dialog>
+          <Modal.CloseTrigger />
+          <Modal.Header><Modal.Heading>{t("newPairingRequest")}</Modal.Heading></Modal.Header>
+          <Modal.Body>
+            {selected && (
+              <div className="flex flex-col gap-1">
+                <Row label={t("username")} value={selected.device_name} />
+                <Row label={t("platform")} value={`${selected.platform} ${selected.client_version}`} />
+                <Row label={t("requestTime")} value={formatTime(selected.created_at)} />
+                <Row label={t("keyFingerprint")} value={<code className="mono text-xs break-all">{selected.key_fingerprint}</code>} />
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            {selected && <Button variant="danger-soft" onPress={() => void reject(selected.request_id)}>{t("reject")}</Button>}
+            {selected && <Button onPress={() => void confirm(selected.request_id)}>{t("confirm")}</Button>}
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }
 
