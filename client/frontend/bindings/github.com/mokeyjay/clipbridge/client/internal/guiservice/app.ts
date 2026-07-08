@@ -44,6 +44,22 @@ export function Boot(store: credstore$0.Store | null): $CancellablePromise<void>
 }
 
 /**
+ * CheckForUpdate 手动触发一次更新检查（设置页「检查更新」按钮用），返回是否发现
+ * 新版本，便于前端提示「已是最新 / 发现新版本」。网络失败返回 error。
+ */
+export function CheckForUpdate(): $CancellablePromise<boolean> {
+    return $Call.ByID(1805990311);
+}
+
+/**
+ * ClearHistory 清空当前会话的同步记录（概览页「清空」按钮用），并推送状态刷新
+ * 概览的计数卡片（计数由记录派生，会一并归零）。
+ */
+export function ClearHistory(): $CancellablePromise<void> {
+    return $Call.ByID(365787606);
+}
+
+/**
  * HandleNotificationResponse routes a notification button tap back to the engine:
  * confirm sends/pulls the held item, anything else discards it. data carries the
  * item's kind ("upload"|"download") and id.

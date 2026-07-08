@@ -143,6 +143,9 @@ function PendingWatcher({ onConfirmed }: { onConfirmed: () => void }) {
   const [selected, setSelected] = useState<PendingRequest | null>(null);
   const seen = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
+  // 用 ref 跟踪当前是否有弹窗，供轮询判断，避免把 selected 放进 effect 依赖。
+  const selectedRef = useRef<PendingRequest | null>(null);
+  selectedRef.current = selected;
 
   useEffect(() => {
     const tick = () =>
@@ -160,7 +163,7 @@ function PendingWatcher({ onConfirmed }: { onConfirmed: () => void }) {
         // 已有弹窗时不开新弹窗、也不提前标记已读，留到当前处理完后再弹下一个。
         // 弹窗本身即提示，不再额外弹 toast（否则确认后 toast 仍滞留，造成「第一个弹窗
         // 还显示在那里」的困惑）。
-        if (selected) return;
+        if (selectedRef.current) return;
         const fresh = pending.find((p) => !seen.current.has(p.request_id));
         if (fresh) {
           seen.current.add(fresh.request_id);
@@ -170,7 +173,11 @@ function PendingWatcher({ onConfirmed }: { onConfirmed: () => void }) {
     tick();
     const id = setInterval(tick, 3000);
     return () => clearInterval(id);
-  }, [selected]);
+    // 只在挂载时建立轮询：不随 selected 重建。否则确认后 setSelected(null) 会让
+    // effect 立即重跑并同步再 tick 一次，在关闭动画未完时立刻重开下一个弹窗，
+    // 触发 HeroUI 受控 Modal 的残留遮罩（一个没有按钮、又关不掉的空弹窗）。
+    // 解耦后，下一个待确认请求留到下一次轮询间隔再弹，关/开之间有干净的时间差。
+  }, []);
 
   const confirm = async (id: string) => {
     setSelected(null); // 立即关闭弹窗，不等待网络往返（避免请求慢/挂起时弹窗滞留）
@@ -192,27 +199,30 @@ function PendingWatcher({ onConfirmed }: { onConfirmed: () => void }) {
     }
   };
 
-  // 受控弹窗：Modal.Backdrop 直接作根节点（外面再包 <Modal> 会引入触发器自身的
-  // 开关状态，与 isOpen 冲突，导致 setSelected(null) 后弹窗关不掉）。
+  // 无待确认请求时压根不渲染弹窗：整棵 Modal 只在 selected 非空时挂载，关闭即硬
+  // 卸载（portal 被彻底移除），换请求时用 key 强制换全新实例。这样既不会出现「有
+  // 内容却没有按钮」的残留空壳（按钮此处已是无条件渲染），也不会叠出第二层遮罩
+  // （旧 overlay 被 React 干净卸载，而非靠退场动画残留在 DOM 里）。
+  // 受控弹窗以 Modal.Backdrop 直接作根节点（外包 <Modal> 会引入触发器自身的开关
+  // 状态，与受控 isOpen 冲突）。
+  if (!selected) return null;
   return (
-    <Modal.Backdrop isOpen={selected !== null} onOpenChange={(o) => !o && setSelected(null)}>
+    <Modal.Backdrop key={selected.request_id} isOpen onOpenChange={(o) => !o && setSelected(null)}>
       <Modal.Container>
         <Modal.Dialog>
           <Modal.CloseTrigger />
           <Modal.Header><Modal.Heading>{t("newPairingRequest")}</Modal.Heading></Modal.Header>
           <Modal.Body>
-            {selected && (
-              <div className="flex flex-col gap-1">
-                <Row label={t("username")} value={selected.device_name} />
-                <Row label={t("platform")} value={`${selected.platform} ${selected.client_version}`} />
-                <Row label={t("requestTime")} value={formatTime(selected.created_at)} />
-                <Row label={t("keyFingerprint")} value={<code className="mono text-xs break-all">{selected.key_fingerprint}</code>} />
-              </div>
-            )}
+            <div className="flex flex-col gap-1">
+              <Row label={t("username")} value={selected.device_name} />
+              <Row label={t("platform")} value={`${selected.platform} ${selected.client_version}`} />
+              <Row label={t("requestTime")} value={formatTime(selected.created_at)} />
+              <Row label={t("keyFingerprint")} value={<code className="mono text-xs break-all">{selected.key_fingerprint}</code>} />
+            </div>
           </Modal.Body>
           <Modal.Footer>
-            {selected && <Button variant="danger-soft" onPress={() => void reject(selected.request_id)}>{t("reject")}</Button>}
-            {selected && <Button onPress={() => void confirm(selected.request_id)}>{t("confirm")}</Button>}
+            <Button variant="danger-soft" onPress={() => void reject(selected.request_id)}>{t("reject")}</Button>
+            <Button onPress={() => void confirm(selected.request_id)}>{t("confirm")}</Button>
           </Modal.Footer>
         </Modal.Dialog>
       </Modal.Container>

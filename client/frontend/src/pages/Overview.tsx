@@ -189,6 +189,19 @@ function PairedOverview({ status, onChange }: { status: StatusDTO; onChange: () 
     await Svc.SetPaused(false);
     onChange();
   };
+
+  // 清空同步记录：立即清本地列表并复位页码（快照式反馈），后端一并归零计数。
+  const clearRecords = async () => {
+    try {
+      await Svc.ClearHistory();
+      setHistory([]);
+      setPage(1);
+      toastOK(t("toast_records_cleared"));
+      onChange();
+    } catch (e) {
+      toastErr(humanError(e));
+    }
+  };
   const connText = status.paused ? t("status_paused") : status.connected ? t("status_connected") : t("status_connecting");
 
   // 服务器卡片：主标题显示实例名（拿到前回退为端点），小字显示实际接入端点。
@@ -263,29 +276,42 @@ function PairedOverview({ status, onChange }: { status: StatusDTO; onChange: () 
       <div>
         <div className="mb-1.5 ml-1 flex items-center justify-between">
           <span className="text-[13px] font-semibold text-foreground">{t("sync_records")}</span>
-          {history.length > pageSize && (
-            <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1">
+            {history.length > pageSize && (
+              <>
+                <button
+                  type="button"
+                  aria-label="prev"
+                  disabled={curPage <= 1}
+                  onClick={() => setPage(curPage - 1)}
+                  className="no-drag inline-grid size-6 place-items-center rounded-md text-foreground-secondary transition hover:bg-default-100 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  <Icon name="arrowLeft" size={14} />
+                </button>
+                <span className="min-w-[44px] text-center text-[11px] tabular-nums text-foreground-secondary">{curPage} / {totalPages}</span>
+                <button
+                  type="button"
+                  aria-label="next"
+                  disabled={curPage >= totalPages}
+                  onClick={() => setPage(curPage + 1)}
+                  className="no-drag inline-grid size-6 place-items-center rounded-md text-foreground-secondary transition hover:bg-default-100 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  <Icon name="arrowRight" size={14} />
+                </button>
+              </>
+            )}
+            {history.length > 0 && (
               <button
                 type="button"
-                aria-label="prev"
-                disabled={curPage <= 1}
-                onClick={() => setPage(curPage - 1)}
-                className="no-drag inline-grid size-6 place-items-center rounded-md text-foreground-secondary transition hover:bg-default-100 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+                aria-label={t("clear_records")}
+                title={t("clear_records")}
+                onClick={() => void clearRecords()}
+                className="no-drag inline-grid size-6 place-items-center rounded-md text-foreground-secondary transition hover:bg-default-100 hover:text-foreground"
               >
-                <Icon name="arrowLeft" size={14} />
+                <Icon name="broom" size={14} />
               </button>
-              <span className="min-w-[44px] text-center text-[11px] tabular-nums text-foreground-secondary">{curPage} / {totalPages}</span>
-              <button
-                type="button"
-                aria-label="next"
-                disabled={curPage >= totalPages}
-                onClick={() => setPage(curPage + 1)}
-                className="no-drag inline-grid size-6 place-items-center rounded-md text-foreground-secondary transition hover:bg-default-100 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
-              >
-                <Icon name="arrowRight" size={14} />
-              </button>
-            </span>
-          )}
+            )}
+          </span>
         </div>
         <Surface>
           {history.length === 0 ? (

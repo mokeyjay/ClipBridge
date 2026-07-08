@@ -20,6 +20,12 @@ const zh = {
   loading: "加载中…",
   update_new: "新版本",
   update_hint: "发现新版本 {v}，点击查看",
+  check_update: "检查更新",
+  toast_update_latest: "已是最新版本",
+  toast_update_found: "发现新版本",
+  toast_update_none: "没有检测到新版本",
+  clear_records: "清空记录",
+  toast_records_cleared: "已清空记录",
 
   // 配对流程
   connect_title: "连接到服务器",
@@ -210,6 +216,12 @@ const en: Record<keyof typeof zh, string> = {
   loading: "Loading…",
   update_new: "New version",
   update_hint: "New version {v} available — click to view",
+  check_update: "Check for updates",
+  toast_update_latest: "You're on the latest version",
+  toast_update_found: "New version available",
+  toast_update_none: "No new version found",
+  clear_records: "Clear records",
+  toast_records_cleared: "Records cleared",
 
   connect_title: "Connect to server",
   connect_sub: "Enter the device-port address and the 6-digit pairing code from the web console.",

@@ -4,7 +4,7 @@ import { App as Svc, type AboutDTO, type PeerDTO, type StatusDTO } from "../api"
 import { useI18n } from "../i18n";
 import { toastOK, toastErr, humanError } from "../notify";
 import { fpHeadTail } from "../util";
-import { CopyButton, Icon, InfoRow, SectionTitle, Surface } from "../components/common";
+import { CopyButton, Icon, InfoRow, SectionTitle, Spinner, Surface } from "../components/common";
 
 // AboutPage：身份信息 + 设备互验 + 诊断信息 + 危险操作。
 // 设备互验按 prd/03 §5.3 补齐：展示同用户全部设备的公钥指纹，
@@ -70,6 +70,7 @@ export function AboutPage({ status, onChange }: { status: StatusDTO; onChange: (
         <Surface>
           <InfoRow label={t("ab_version")}>
             <span className="mono">{about?.version || "—"}</span>
+            <UpdateCheckButton />
           </InfoRow>
           <InfoRow label={t("ab_lasterr")} align="start" wrapValue={!!status.last_error}>
             <span className={status.last_error ? "text-danger" : "text-foreground-secondary"}>
@@ -94,6 +95,32 @@ export function AboutPage({ status, onChange }: { status: StatusDTO; onChange: (
 
       <ResetModal show={showReset} onClose={() => setShowReset(false)} onReset={() => void reset()} />
     </div>
+  );
+}
+
+// UpdateCheckButton 手动触发一次更新检查（复用后端自动检查逻辑）。发现更新时后端
+// 已推送状态、顶栏入口随之出现；这里只给 toast 反馈。按用户要求：任何检查失败都
+// 一律提示「没有检测到新版本」，绝不把错误术语抛给用户。
+function UpdateCheckButton() {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const check = async () => {
+    setBusy(true);
+    try {
+      const found = await Svc.CheckForUpdate();
+      toastOK(found ? t("toast_update_found") : t("toast_update_latest"));
+    } catch {
+      // 网络/接口异常统一按「没有检测到新版本」处理，不暴露技术细节。
+      toastOK(t("toast_update_none"));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button size="sm" variant="ghost" className="no-drag gap-1" onPress={() => void check()} isDisabled={busy}>
+      {busy ? <Spinner size={13} /> : <Icon name="refresh" size={13} />}
+      {t("check_update")}
+    </Button>
   );
 }
 

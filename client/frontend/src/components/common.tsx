@@ -4,6 +4,7 @@ import {
   RiArrowLeftLine,
   RiArrowRightLine,
   RiArrowUpLine,
+  RiBrush3Line,
   RiCheckLine,
   RiCloseLine,
   RiComputerLine,
@@ -68,6 +69,7 @@ const ICONS: Record<string, RemixiconComponentType> = {
   plug: RiPlugLine,
   folder: RiFolderLine,
   clock: RiTimeLine,
+  broom: RiBrush3Line,
 };
 
 export function Icon({ name, size = 16, className = "", style }: { name: string; size?: number; className?: string; style?: CSSProperties }) {

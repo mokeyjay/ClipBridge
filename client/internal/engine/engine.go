@@ -1100,6 +1100,14 @@ func (e *Engine) findEventIndex(id string) int {
 	return -1
 }
 
+// ClearHistory 清空本次会话的同步记录（内存态）。因上传/下载计数由 history 派生，
+// 计数也随之归零。仅影响展示日志，不影响待确认项的实际处理状态。
+func (e *Engine) ClearHistory() {
+	e.mu.Lock()
+	e.history = nil
+	e.mu.Unlock()
+}
+
 // History returns a copy of the current session's sync history.
 func (e *Engine) History() []Event {
 	e.mu.Lock()

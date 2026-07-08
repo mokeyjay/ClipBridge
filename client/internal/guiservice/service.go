@@ -531,7 +531,7 @@ func (a *App) Boot(ctx context.Context, store *credstore.Store) {
 // updateCheckLoop 检查是否有新的正式版：冷启动立即检查一次，之后每 24 小时检查
 // 一次。全程异步、失败静默，绝不阻塞其他功能。
 func (a *App) updateCheckLoop(ctx context.Context) {
-	a.checkForUpdate(ctx)
+	_, _ = a.checkForUpdate(ctx)
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
 	for {
@@ -539,20 +539,21 @@ func (a *App) updateCheckLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			a.checkForUpdate(ctx)
+			_, _ = a.checkForUpdate(ctx)
 		}
 	}
 }
 
 // checkForUpdate 拉取仓库最新正式版并与当前版本比较，发现更新时记录版本与
-// release 页面地址并推送状态给前端。任何失败都静默忽略（保持既有状态不变）。
-func (a *App) checkForUpdate(ctx context.Context) {
+// release 页面地址并推送状态给前端。返回是否发现更新；网络失败返回 error（自动
+// 轮询忽略该错误，手动检查则据此给用户反馈）。
+func (a *App) checkForUpdate(ctx context.Context) (bool, error) {
 	rel, err := updatecheck.Latest(ctx)
-	if err != nil || rel == nil {
-		return
+	if err != nil {
+		return false, err
 	}
-	if !updatecheck.IsNewer(rel.TagName, a.version) {
-		return
+	if rel == nil || !updatecheck.IsNewer(rel.TagName, a.version) {
+		return false, nil
 	}
 	a.mu.Lock()
 	changed := !a.updateAvailable || a.latestVersion != rel.TagName
@@ -563,6 +564,28 @@ func (a *App) checkForUpdate(ctx context.Context) {
 	if changed {
 		a.pushStatus()
 	}
+	return true, nil
+}
+
+// CheckForUpdate 手动触发一次更新检查（设置页「检查更新」按钮用），返回是否发现
+// 新版本，便于前端提示「已是最新 / 发现新版本」。网络失败返回 error。
+func (a *App) CheckForUpdate() (bool, error) {
+	a.mu.Lock()
+	ctx := a.rootCtx
+	a.mu.Unlock()
+	return a.checkForUpdate(ctx)
+}
+
+// ClearHistory 清空当前会话的同步记录（概览页「清空」按钮用），并推送状态刷新
+// 概览的计数卡片（计数由记录派生，会一并归零）。
+func (a *App) ClearHistory() {
+	a.mu.Lock()
+	eng := a.eng
+	a.mu.Unlock()
+	if eng != nil {
+		eng.ClearHistory()
+	}
+	a.pushStatus()
 }
 
 // Pair runs the pairing flow and, on success, starts the runtime. The server
